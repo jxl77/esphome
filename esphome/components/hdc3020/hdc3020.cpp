@@ -7,7 +7,7 @@ namespace hdc3020 {
 
 static const char *const TAG = "hdc3020";
 
-static const uint8_t HDC3020_ADDRESS = 0x44;  // 0b1000000 from datasheet
+static const uint8_t HDC3020_ADDRESS = 0x48;  // 0b1000000 from datasheet
 static const uint8_t HDC3020_CMD_CONFIGURATION = 0x02;
 static const uint8_t HDC3020_CMD_TEMPERATURE = 0x00;
 static const uint8_t HDC3020_CMD_HUMIDITY = 0x01;
