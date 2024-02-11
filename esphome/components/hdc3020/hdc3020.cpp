@@ -53,7 +53,7 @@ void HDC3020Component::update() {
   float humidity = ((float)raw_humidity / 65535) * 100;
   this->humidity_->publish_state(humidity);
 
-  ESP_LOGD(TAG, "Got temperature=%.1f°C (raw=%d) humidity=%.1f%% (raw=%d)", temp, raw_temp, humidity, raw_humidity);
+  ESP_LOGD(TAG, "Got temperature=%.2f°C (raw=%d) humidity=%.2f%% (raw=%d)", temp, raw_temp, humidity, raw_humidity);
   this->status_clear_warning();
 }
 float HDC3020Component::get_setup_priority() const { return setup_priority::DATA; }
