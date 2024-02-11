@@ -7,25 +7,18 @@ namespace hdc3020 {
 
 static const char *const TAG = "hdc3020";
 
-static const uint8_t HDC3020_ADDRESS = 0x48;  // 0b1000000 from datasheet
-static const uint8_t HDC3020_CMD_CONFIGURATION = 0x02;
-static const uint8_t HDC3020_CMD_TEMPERATURE = 0x00;
-static const uint8_t HDC3020_CMD_HUMIDITY = 0x01;
-
 void HDC3020Component::setup() {
   ESP_LOGCONFIG(TAG, "Setting up HDC3020...");
 
-  const uint8_t data[2] = {
-      0b00000000,  // resolution 14bit for both humidity and temperature
-      0b00000000   // reserved
-  };
+  const uint8_t data[2] = { 0x24, 0x0 };
 
-  if (!this->write_bytes(HDC3020_CMD_CONFIGURATION, data, 2)) {
-    // as instruction is same as powerup defaults (for now), interpret as warning if this fails
-    ESP_LOGW(TAG, "HDC3020 initial config instruction error");
+  if (this->write(data, 2) != i2c::ERROR_OK) {
+    ESP_LOGW(TAG, "HDC3020 initialization failed");
     this->status_set_warning();
-    return;
   }
+
+  delay(20);
+
 }
 void HDC3020Component::dump_config() {
   ESP_LOGCONFIG(TAG, "HDC3020:");
@@ -38,35 +31,29 @@ void HDC3020Component::dump_config() {
   LOG_SENSOR("  ", "Humidity", this->humidity_);
 }
 void HDC3020Component::update() {
-  uint16_t raw_temp;
-  if (this->write(&HDC3020_CMD_TEMPERATURE, 1) != i2c::ERROR_OK) {
+
+  const uint8_t data[2] = { 0x24, 0x0 };
+  if (this->write(data, 2) != i2c::ERROR_OK) {
+    ESP_LOGW(TAG, "HDC3020 initialization failed");
     this->status_set_warning();
-    return;
   }
   delay(20);
-  if (this->read(reinterpret_cast<uint8_t *>(&raw_temp), 2) != i2c::ERROR_OK) {
+
+  uint8_t buffer[6];
+  if (this->read((uint8_t *)&buffer, 6) != i2c::ERROR_OK) {
     this->status_set_warning();
     return;
   }
-  raw_temp = i2c::i2ctohs(raw_temp);
-  float temp = raw_temp * 0.0025177f - 40.0f;  // raw * 2^-16 * 165 - 40
+
+  uint16_t raw_temp = i2c::i2ctohs(*(uint16_t *)(buffer));
+  float temp = ((float)raw_temp / 65535) * 175 - 45;
   this->temperature_->publish_state(temp);
 
-  uint16_t raw_humidity;
-  if (this->write(&HDC3020_CMD_HUMIDITY, 1) != i2c::ERROR_OK) {
-    this->status_set_warning();
-    return;
-  }
-  delay(20);
-  if (this->read(reinterpret_cast<uint8_t *>(&raw_humidity), 2) != i2c::ERROR_OK) {
-    this->status_set_warning();
-    return;
-  }
-  raw_humidity = i2c::i2ctohs(raw_humidity);
-  float humidity = raw_humidity * 0.001525879f;  // raw * 2^-16 * 100
+  uint16_t raw_humidity = i2c::i2ctohs(*(uint16_t *)(buffer + 3));
+  float humidity = ((float)raw_humidity / 65535) * 100;
   this->humidity_->publish_state(humidity);
 
-  ESP_LOGD(TAG, "Got temperature=%.1f°C humidity=%.1f%%", temp, humidity);
+  ESP_LOGD(TAG, "Got temperature=%.1f°C (raw=%d) humidity=%.1f%% (raw=%d)", temp, raw_temp, humidity, raw_humidity);
   this->status_clear_warning();
 }
 float HDC3020Component::get_setup_priority() const { return setup_priority::DATA; }
